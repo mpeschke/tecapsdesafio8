@@ -2,6 +2,11 @@
 * Desafio 8
 * Matheus Peschke de Azevedo - RA: 20396209
 * Gustavo Caldas de Souza - RA: 21352329
+*
+* Se você tiver uma conta no Github, envie seu endereço
+* cadastrado no Github para 'mpeschke@gmail.com', para ter
+* acesso ao repositório privado onde está essa solução, estruturada
+* com testes unitários para validação de qualidade.
 */
 #include "desafio8.h"
 
@@ -19,7 +24,7 @@
 #define MAXGOLS 20
 
 /*
- * Estrutura para organizar as informações de um indivíduo.
+ * Estrutura para organizar as informações de um jogo.
  *
 */
 struct Placar {
@@ -30,42 +35,49 @@ struct Placar {
     char winner;
 } typedef stPlacar;
 
+// Jogos totais, considerando todas as rodadas.
 static stPlacar jogos[MAXJOGOS];
 
 /*
  *
  *********************ANALISADOR LÉXICO (TOKENIZADOR)*****************************************
  *
+ * Observação: o mesmo conceito de análise léxica foi criando anteriormente
+ * no desafio #1, por esse mesmo time.
+ * Reutilizando aqui o mesmo conceito, por também haver a necessidade de análise léxica de entradas
+ * do usuário.
+ *
  * Definições que fazem parte de um analisador léxico:
  *
  * 'sentença' = a linha de comando com todos os seus parâmetros
  * 'token' = um item que esteja separados dos outros por um ou mais espaços.
- * 'verbo' = o primeiro token, que identifica o tipo de comando
- * 'parâmetro' = todos os outros tokens, após o token de verbo.
+ * 'parâmetro' = qualquer um dos tokens.
  *
  * Exemplo:
- *
- * add               123               Igor               Borges               25/12/1990               +55-11-2222-3333
- * ^                 ^                 ^                  ^                    ^                        ^
- * |                 |                 |                  |                    |                        |
- * token (verbo)     token (parâmetro) token (parâmetro)  token (parâmetro)    token (parâmetro)        token (parâmetro)
+ *          10
+ *          |
+ * 0123456789
+ * 20 19
+ * ^  ^
+ * |  |
+ * token (gols do time 'm')
+ *    |
+ *    token (gols do time 'n')
 */
 static const char SENTENCETOKENSEPARATOR = ' ';
 
 /* A partir do cursor inicial fornecido, avança até encontrar o próximo token.
  *
  * Exemplo:
- *          10        20        30        40        50        60        70        80        90        100       110
- *          |         |         |         |         |         |         |         |         |         |         |
- * 123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
- * add  ^            123               Igor               Borges               25/12/1990               +55-11-2222-3333
- * ^    |            ^                 ^                  ^                    ^                        ^
- * |    |            |                 |                  |                    |                        |
- * token|(verbo)     token (parâmetro) token (parâmetro)  token (parâmetro)    token (parâmetro)        token (parâmetro)
- *      |            |
- *      *pinitialposition = 6.
- *                   |
- *                   função retorna posição do próximo token, '123' = 19.
+ *          10
+ *          |
+ * 0123456789
+ * 20^19
+ *   ||
+ *   ||
+ *   *pinitialposition = 2.
+ *    |
+ *    função retorna posição do próximo token, '19' = 3.
 */
 int advancetonexttoken(const char *const    sentence,
                        const int *const     pinitialposition,
@@ -85,18 +97,16 @@ int advancetonexttoken(const char *const    sentence,
 /* Copia o token para um buffer, identificando também onde termina esse token na sentença.
  *
  * Exemplo:
- *          10        20        30        40        50        60        70        80        90        100       110
- *          |         |         |         |         |         |         |         |         |         |         |
- * 123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
- * add  ^            123               Igor               Borges               25/12/1990               +55-11-2222-3333
- * ^    |              ^               ^                  ^                    ^                        ^
- * |    |              |               |                  |                    |                        |
- * token|(verbo)     token (parâmetro) token (parâmetro)  token (parâmetro)    token (parâmetro)        token (parâmetro)
- *      |              |
- *      *pposicaoleiturainicial = 6.
- *                     |
- *                     *pposicaoleiturafinal = 21.
- *                   token = '123'
+ *          10
+ *          |
+ * 0123456789
+ * 20^19
+ *   | ^
+ *   | |
+ *   *pposicaoleiturainicial = 2.
+ *     |
+ *     *pposicaoleiturafinal = 4.
+ *     token = '19'
 */
 BOOL getsentencetoken(const int* const  pposicaoleiturainicial,
                       int*              pposicaoleiturafinal,
@@ -137,20 +147,20 @@ BOOL getsentencetoken(const int* const  pposicaoleiturainicial,
  * Copia o token para um buffer, identificando também onde termina esse token na sentença.
  *
  * Exemplo:
- *          10        20        30        40        50        60        70        80        90        100       110
- *          |         |         |         |         |         |         |         |         |         |         |
- * 123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
- * add  ^            123               Igor               Borges               25/12/1990               +55-11-2222-3333
- * ^    |            ^ ^               ^                  ^                    ^                        ^
- * |    |            | |               |                  |                    |                        |
- * token|(verbo)     token (parâmetro) token (parâmetro)  token (parâmetro)    token (parâmetro)        token (parâmetro)
- *      |            | |
- *      *pposicaoleiturainicial = 6.
- *                   |
- *                   *pposicaoleiturainicial = 19.
- *                     |
- *                     *pposicaoleiturafinal = 21.
- *                   token = '123'
+ *          10
+ *          |
+ * 0123456789
+ * 20^19
+ *   |^^
+ *   |||
+ *   | token (gols do time 'n')
+ *   |||
+ *   *pposicaoleiturainicial = 2.
+ *    ||
+ *    *pposicaoleiturainicial = 3.
+ *     |
+ *     *pposicaoleiturafinal = 4.
+ *     token = '19'
 */
 BOOL getnextsentencetoken(int* const        pposicaoleiturainicial,
                           int*              pposicaoleiturafinal,
@@ -189,16 +199,7 @@ BOOL validatetokengols(const char *const golsparam, unsigned int* pgols)
 }
 
 /*
-* Dada a peculiaridade incomum do enunciado do exercício, no qual é possível
-* identificar a existência de um indivíduo já cadastrado pelo seu ID através
-* de um comando 'add' lexicamente INCORRETO:
-*
-* 'add 123 Joao Souza 11/10/2000 103-99'
-*                                ^
-*                                |
-*                                token de telefone inválido
-*
-* temos que utilizar um analisador léxico customizado para esse cenário.
+* Analisador léxico para identificar o placar de um jogo.
 */
 BOOL placarlexicalanalyser(const char *const sentence, stPlacar* pplacar)
 {
@@ -212,6 +213,7 @@ BOOL placarlexicalanalyser(const char *const sentence, stPlacar* pplacar)
 
     char tokenbuffer[MAXBUFFGOLS];
 
+    // Regra #1: é necessário haver o total de gols do time 'm', entre 0 e um máximo de 20.
     int tokeninitialpos = 0;
     int tokenfinalpos = tokeninitialpos;
 
@@ -222,12 +224,14 @@ BOOL placarlexicalanalyser(const char *const sentence, stPlacar* pplacar)
     if(!validatetokengols(tokenbuffer, &(pplacar->m)))
         return FALSE;
 
+    // Regra #2: é necessário haver o total de gols do time 'n', entre 0 e um máximo de 20.
     if(!getnextsentencetoken(&tokeninitialpos, &tokenfinalpos, sentence, &sentencesize, tokenbuffer, &maxbuffergols))
         return FALSE;
 
     if(!validatetokengols(tokenbuffer, &(pplacar->n)))
         return FALSE;
 
+    // Regra #3: não pode haver empate.
     if(pplacar->m == pplacar->n)
         return FALSE;
 
@@ -242,24 +246,79 @@ BOOL placarlexicalanalyser(const char *const sentence, stPlacar* pplacar)
  * o token da sentença.
 */
 void zero_fgets_trailchars(char* buff)
-{buff[strcspn(buff, "\r\n")] = 0;}
+{buff[strcspn(buff, "\r\n")] = '\0';}
 
+/*
+ * Infelizmente o Ruindows considera como terminador de
+ * linha dois caracteres, '\r' e '\n'. Como não sabemos se o
+ * exercício será avaliado num Ruindows, tratamos as diferenças
+ * de plataforma nessa função.
+*/
+char* platformindependent_terminatorchar(char* buff)
+{
+    // Retorna a posição ao encontrar o primeiro desses caracteres terminadores.
+    unsigned long pos = strcspn(buff, "\r\n");
+    // Como pode encontrar o caracter terminador APÓS a string,
+    // Identificamos como não encontrado (string vazia).
+    if(pos >= strlen(buff))
+        return NULL;
+    else
+        return &buff[pos];
+}
+
+/*
+ * fgets, por segurança, vai continuamente alimentando o buffer
+ * até o final da entrada (stdin), até encontrar um caracter terminador.
+ * Por isso tratamos a função de acordo, considerando apenas a primeira
+ * vez em que ela preenche o buffer, e ignorando o resto das entradas.
+*/
+void read_fgets_firstbuffer(char* buff, char* finalbuff)
+{
+    /* BUFF[MAXBUFFPLACAR+2U]
+     *          |10
+     * 01234567890123456789
+     * 20 19n0
+     *      ^^
+     *      ||
+     *      fgets vai adicionar na posição 5 o terminador (se houver)
+     *      e terminar a string adicionando \0 na posição 6.
+     *       |tamanho real do buffer: (MAXBUFFPLACAR+2U).
+    */
+    char* presult = fgets(buff, MAXBUFFPLACAR+1U, stdin);
+    // Nos interessa apenas o conteúdo da primeira vez em
+    // que o fgets preenche o buffer vindo de stdin (entrada do teclado).
+    strcpy(finalbuff, buff);
+    char* newlinefound = platformindependent_terminatorchar(presult);
+    zero_fgets_trailchars(finalbuff);
+    while(newlinefound == NULL)
+    {
+        // Ainda não encontrou o terminador nessa cópia do
+        // buffer - preenche continuamente o buffer até encontrar.
+        presult = fgets(buff, MAXBUFFPLACAR+1U, stdin);
+        newlinefound = platformindependent_terminatorchar(presult);
+    }
+}
+
+// O vencedor é o time com o maior número de gols.
 char vencedordojogo(const stPlacar *const pplacar)
 {return pplacar->m > pplacar->n ? pplacar->mplayer : pplacar->nplayer;}
 
 /*
  *
- ***************************************CRUD ENGINE*******************************************
+ ***************************************INICIA AS OITAVAS DE FINAL*****************
  *
 */
 void iniciaOITAVAS(void)
 {
     static const char selecao = 'A';
+    // Solicita os placares dos primeiros oito jogos (Oitavas de Final).
     for(unsigned int i = 0U; i < 8U; i++)
     {
         BOOL valid = FALSE;
-        while(!valid)
+        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
         {
+            // Aproveita as interações das oitavas de final para
+            // coletar os identificadores dos times ('A' a 'P').
             stPlacar placar = {
                 .mplayer = selecao + 2*i,
                 .m = 0U,
@@ -267,13 +326,16 @@ void iniciaOITAVAS(void)
                 .n = 0U,
                 .winner = '\0'
             };
-            char BUFF[MAXBUFFPLACAR+1] = {'\0'};
+            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
+            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
 
             printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            fgets(BUFF, MAXBUFFPLACAR, stdin);
-            zero_fgets_trailchars(BUFF);
+            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
+            // que acomoda o placar 'm x n'.
+            read_fgets_firstbuffer(BUFF, FINALBUFF);
 
-            valid = placarlexicalanalyser(BUFF, &placar);
+            // Valida se o placar é lexicamente correto.
+            valid = placarlexicalanalyser(FINALBUFF, &placar);
             if(valid)
             {
                 placar.winner = vencedordojogo(&placar);
@@ -283,13 +345,21 @@ void iniciaOITAVAS(void)
     }
 }
 
+/*
+ *
+ ***************************************INICIA AS QUARTAS DE FINAL*****************
+ *
+*/
 void iniciaQUARTAS(void)
 {
+    // Solicita os placares dos subsequentes quatro jogos (Quartas de Final).
     for(unsigned int i = 8U; i < 12U; i++)
     {
         BOOL valid = FALSE;
-        while(!valid)
+        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
         {
+            // Obtém os identificadores dos times de seus placares previamente preenchidos
+            // durante as oitavas de final.
             stPlacar placar = {
                 .mplayer = jogos[0 + 2*(i ^ 8)].winner,
                 .m = 0U,
@@ -297,12 +367,15 @@ void iniciaQUARTAS(void)
                 .n = 0U,
                 .winner = '\0'
             };
-            char BUFF[MAXBUFFPLACAR+1] = {'\0'};
+            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
+            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
 
             printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            fgets(BUFF, MAXBUFFPLACAR, stdin);
-            zero_fgets_trailchars(BUFF);
+            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
+            // que acomoda o placar 'm x n'.
+            read_fgets_firstbuffer(BUFF, FINALBUFF);
 
+            // Valida se o placar é lexicamente correto.
             valid = placarlexicalanalyser(BUFF, &placar);
             if(valid)
             {
@@ -313,13 +386,21 @@ void iniciaQUARTAS(void)
     }
 }
 
+/*
+ *
+ ***************************************INICIA AS SEMIFINAIS **********************
+ *
+*/
 void iniciaSEMIFINAIS(void)
 {
+    // Solicita os placares dos subsequentes dois jogos (Semifinais).
     for(unsigned int i = 12U; i < 14U; i++)
     {
         BOOL valid = FALSE;
-        while(!valid)
+        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
         {
+            // Obtém os identificadores dos times de seus placares previamente preenchidos
+            // durante as oitavas de final.
             stPlacar placar = {
                 .mplayer = jogos[8 + 2*(i ^ 12)].winner,
                 .m = 0U,
@@ -327,12 +408,15 @@ void iniciaSEMIFINAIS(void)
                 .n = 0U,
                 .winner = '\0'
             };
-            char BUFF[MAXBUFFPLACAR+1] = {'\0'};
+            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
+            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
 
             printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            fgets(BUFF, MAXBUFFPLACAR, stdin);
-            zero_fgets_trailchars(BUFF);
+            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
+            // que acomoda o placar 'm x n'.
+            read_fgets_firstbuffer(BUFF, FINALBUFF);
 
+            // Valida se o placar é lexicamente correto.
             valid = placarlexicalanalyser(BUFF, &placar);
             if(valid)
             {
@@ -343,13 +427,21 @@ void iniciaSEMIFINAIS(void)
     }
 }
 
+/*
+ *
+ ***************************************INICIA A FINAL DA COPA DO MUNDO************
+ *
+*/
 void iniciaFINAL(void)
 {
+    // Solicita o placar do último jogo (Final da Copa do Mundo).
     for(unsigned int i = 14U; i < MAXJOGOS; i++)
     {
         BOOL valid = FALSE;
-        while(!valid)
+        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
         {
+            // Obtém os identificadores dos times de seus placares previamente preenchidos
+            // durante as oitavas de final.
             stPlacar placar = {
                 .mplayer = jogos[12 + 2*(i ^ 14)].winner,
                 .m = 0U,
@@ -357,12 +449,15 @@ void iniciaFINAL(void)
                 .n = 0U,
                 .winner = '\0'
             };
-            char BUFF[MAXBUFFPLACAR+1] = {'\0'};
+            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
+            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
 
             printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            fgets(BUFF, MAXBUFFPLACAR, stdin);
-            zero_fgets_trailchars(BUFF);
+            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
+            // que acomoda o placar 'm x n'.
+            read_fgets_firstbuffer(BUFF, FINALBUFF);
 
+            // Valida se o placar é lexicamente correto.
             valid = placarlexicalanalyser(BUFF, &placar);
             if(valid)
             {
@@ -373,13 +468,20 @@ void iniciaFINAL(void)
     }
 }
 
+/*
+ *
+ ***************************************INICIA AS RODADAS DA COPA DO MUNDO*********
+ *
+*/
 void iniciaCOPADOMUNDO(void)
 {
+    // Obtém os placares das rodadas da copa, sequencialmente.
     iniciaOITAVAS();
     iniciaQUARTAS();
     iniciaSEMIFINAIS();
     iniciaFINAL();
 
+    // Imprime o time campeão do mundo.
     printf("%c\n", jogos[MAXJOGOS-1U].winner);
 }
 
