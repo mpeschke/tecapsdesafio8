@@ -17,6 +17,7 @@
 #define TRUE 1
 #define FALSE 0
 
+// Variáveis para ajudar a lidar com operações de buffer.
 #define MAXJOGOS 15
 #define MAXBUFFPLACAR 5
 #define MINBUFFPLACAR 3
@@ -36,7 +37,7 @@ struct Placar {
 } typedef stPlacar;
 
 // Jogos totais, considerando todas as rodadas.
-static stPlacar jogos[MAXJOGOS];
+static stPlacar placares[MAXJOGOS];
 
 /*
  *
@@ -60,9 +61,10 @@ static stPlacar jogos[MAXJOGOS];
  * 20 19
  * ^  ^
  * |  |
- * token (gols do time 'm')
- *    |
- *    token (gols do time 'n')
+ * token ('20' = gols do time 'm')
+ * |  |
+ * |  token ('19' = gols do time 'n')
+ * |sentença ('20 19')
 */
 static const char SENTENCETOKENSEPARATOR = ' ';
 
@@ -180,7 +182,7 @@ BOOL getnextsentencetoken(int* const        pposicaoleiturainicial,
  * Contornando o clássico problema de conversão léxica de string
  * para números. A função atoi() é bem conhecida por inúmeras falhas,
  * sendo a mais infame o retorno do mesmo número '0' quando a string
- * é igual a '0' ou 'SHIT', por exemplo.
+ * é igual a '0' ou 'zero', por exemplo.
  * Para evitar isso, utilizamos 'strtol', que provê um mecanismo
  * sólido para identificar falha ou sucesso na conversão léxica.
 */
@@ -195,6 +197,8 @@ BOOL validatetokengols(const char *const golsparam, unsigned int* pgols)
     BOOL conversiontonum = (errno != EINVAL) && (golsparam != eptr);
 
     *pgols = gols;
+    // 1) Deve haver algo no buffer, 2) o buffer não pode ser maior que '00 00', 3) a conversão pra número
+    // deve ter sido realizada com sucesso, 4) 0 ou mais gols e 5) máximo de 20 gols.
     return ((length > 0) && (length <= MAXBUFFGOLS) && conversiontonum && ((gols >= 0U) && (gols <= MAXGOLS)));
 }
 
@@ -282,6 +286,7 @@ void read_fgets_firstbuffer(char* buff, char* finalbuff)
      *      ||
      *      fgets vai adicionar na posição 5 o terminador (se houver)
      *      e terminar a string adicionando \0 na posição 6.
+     *       |
      *       |tamanho real do buffer: (MAXBUFFPLACAR+2U).
     */
     char* presult = fgets(buff, MAXBUFFPLACAR+1U, stdin);
@@ -303,26 +308,42 @@ void read_fgets_firstbuffer(char* buff, char* finalbuff)
 char vencedordojogo(const stPlacar *const pplacar)
 {return pplacar->m > pplacar->n ? pplacar->mplayer : pplacar->nplayer;}
 
-/*
- *
- ***************************************INICIA AS OITAVAS DE FINAL*****************
- *
-*/
-void iniciaOITAVAS(void)
+// Identifica o time da partida de oitavas.
+unsigned int identifica_time_oitavas(unsigned int j, unsigned int i)
+{return ('A' + 2U*i + j);}
+
+// Identifica o time vencedor na partida da rodada anterior (oitavas).
+unsigned int identifica_time_vencedor_oitavas(unsigned int j, unsigned int i)
+{return placares[j + 2U*(i ^ 8U)].winner;}
+
+// Identifica o time vencedor na partida da rodada anterior (quartas).
+unsigned int identifica_time_vencedor_quartas(unsigned int j, unsigned int i)
+{return placares[j+8U + 2U*(i ^ 12U)].winner;}
+
+// Identifica o time vencedor na partida da rodada anterior (semifinal).
+unsigned int identifica_time_vencedor_semifinais(unsigned int j, unsigned int i)
+{return placares[j+12U + 2U*(i ^ 14U)].winner;}
+
+// Assinatura das funções que identificam os times das rodadas e vencedores das anteriores.
+typedef unsigned int(*pidentifica_time)(unsigned int, unsigned int j);
+
+// Inicia uma determinada fase da copa, identificando corretamente quais os jogos iniciais e finais da rodada,
+// assim como o jogo da rodada anterior do time, e seu resultado.
+void iniciaFASE(const unsigned int primeirojogodafase, const unsigned int ultimojogodafase, pidentifica_time pfn)
 {
-    static const char selecao = 'A';
-    // Solicita os placares dos primeiros oito jogos (Oitavas de Final).
-    for(unsigned int i = 0U; i < 8U; i++)
+    for(unsigned int i = primeirojogodafase; i < ultimojogodafase; i++)
     {
         BOOL valid = FALSE;
-        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
+        while(!valid) // Não deixa avançar para o próximo placar enquanto a entrada não for válida.
         {
-            // Aproveita as interações das oitavas de final para
-            // coletar os identificadores dos times ('A' a 'P').
+            // A função pfn vai trazer o time que participa dessa partida - se for
+            // oitavas de final, sequencialmente de 'A' a 'P'. Nas rodadas seguintes,
+            // as funções são inteligentes - buscam os vencedores dos dois jogos
+            // da rodada anterior, que se encontraram na rodada atual.
             stPlacar placar = {
-                .mplayer = selecao + 2*i,
+                .mplayer = pfn(0, i),
                 .m = 0U,
-                .nplayer = selecao + 2*i + 1,
+                .nplayer = pfn(1, i),
                 .n = 0U,
                 .winner = '\0'
             };
@@ -338,142 +359,53 @@ void iniciaOITAVAS(void)
             valid = placarlexicalanalyser(FINALBUFF, &placar);
             if(valid)
             {
+                // Identifica o vencedor pelo placar.
                 placar.winner = vencedordojogo(&placar);
-                jogos[i] = placar;
+                // Atualiza o banco de dados.
+                placares[i] = placar;
             }
         }
     }
 }
+
+/*
+ *
+ ***************************************INICIA AS OITAVAS DE FINAL*****************
+ *
+*/
+void iniciaOITAVAS(void) // Jogo inicial, final e função que identifica os resultados dos times na rodada anterior.
+{iniciaFASE(0U, 8U, &identifica_time_oitavas);}
 
 /*
  *
  ***************************************INICIA AS QUARTAS DE FINAL*****************
  *
 */
-void iniciaQUARTAS(void)
-{
-    // Solicita os placares dos subsequentes quatro jogos (Quartas de Final).
-    for(unsigned int i = 8U; i < 12U; i++)
-    {
-        BOOL valid = FALSE;
-        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
-        {
-            // Obtém os identificadores dos times de seus placares previamente preenchidos
-            // durante as oitavas de final.
-            stPlacar placar = {
-                .mplayer = jogos[0 + 2*(i ^ 8)].winner,
-                .m = 0U,
-                .nplayer = jogos[1 + 2*(i ^ 8)].winner,
-                .n = 0U,
-                .winner = '\0'
-            };
-            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
-            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
-
-            printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
-            // que acomoda o placar 'm x n'.
-            read_fgets_firstbuffer(BUFF, FINALBUFF);
-
-            // Valida se o placar é lexicamente correto.
-            valid = placarlexicalanalyser(BUFF, &placar);
-            if(valid)
-            {
-                placar.winner = vencedordojogo(&placar);
-                jogos[i] = placar;
-            }
-        }
-    }
-}
+void iniciaQUARTAS(void) // Jogo inicial, final e função que identifica os resultados dos times na rodada anterior.
+{iniciaFASE(8U, 12U, &identifica_time_vencedor_oitavas);}
 
 /*
  *
  ***************************************INICIA AS SEMIFINAIS **********************
  *
 */
-void iniciaSEMIFINAIS(void)
-{
-    // Solicita os placares dos subsequentes dois jogos (Semifinais).
-    for(unsigned int i = 12U; i < 14U; i++)
-    {
-        BOOL valid = FALSE;
-        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
-        {
-            // Obtém os identificadores dos times de seus placares previamente preenchidos
-            // durante as oitavas de final.
-            stPlacar placar = {
-                .mplayer = jogos[8 + 2*(i ^ 12)].winner,
-                .m = 0U,
-                .nplayer = jogos[9 + 2*(i ^ 12)].winner,
-                .n = 0U,
-                .winner = '\0'
-            };
-            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
-            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
-
-            printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
-            // que acomoda o placar 'm x n'.
-            read_fgets_firstbuffer(BUFF, FINALBUFF);
-
-            // Valida se o placar é lexicamente correto.
-            valid = placarlexicalanalyser(BUFF, &placar);
-            if(valid)
-            {
-                placar.winner = vencedordojogo(&placar);
-                jogos[i] = placar;
-            }
-        }
-    }
-}
+void iniciaSEMIFINAIS(void) // Jogo inicial, final e função que identifica os resultados dos times na rodada anterior.
+{iniciaFASE(12U, 14U, &identifica_time_vencedor_quartas);}
 
 /*
  *
  ***************************************INICIA A FINAL DA COPA DO MUNDO************
  *
 */
-void iniciaFINAL(void)
-{
-    // Solicita o placar do último jogo (Final da Copa do Mundo).
-    for(unsigned int i = 14U; i < MAXJOGOS; i++)
-    {
-        BOOL valid = FALSE;
-        while(!valid) // Não deixa avançar para o próximo placar enquanto não for válido.
-        {
-            // Obtém os identificadores dos times de seus placares previamente preenchidos
-            // durante as oitavas de final.
-            stPlacar placar = {
-                .mplayer = jogos[12 + 2*(i ^ 14)].winner,
-                .m = 0U,
-                .nplayer = jogos[12 + 2*(i ^ 14)].winner,
-                .n = 0U,
-                .winner = '\0'
-            };
-            char BUFF[MAXBUFFPLACAR+2U] = {'\0'};
-            char FINALBUFF[MAXBUFFPLACAR+2U] = {'\0'};
-
-            printf("Digite o placar do jogo #%d no formato 'GOLS GOLS' - máximo de 20 gols por time e não pode haver empate: ", i+1U);
-            // Trata a função fgets adequadamente, de forma a ler apenas o limite do buffer
-            // que acomoda o placar 'm x n'.
-            read_fgets_firstbuffer(BUFF, FINALBUFF);
-
-            // Valida se o placar é lexicamente correto.
-            valid = placarlexicalanalyser(BUFF, &placar);
-            if(valid)
-            {
-                placar.winner = vencedordojogo(&placar);
-                jogos[i] = placar;
-            }
-        }
-    }
-}
+void iniciaFINAL(void) // Jogo inicial, final e função que identifica os resultados dos times na rodada anterior.
+{iniciaFASE(14U, MAXJOGOS, &identifica_time_vencedor_semifinais);}
 
 /*
  *
  ***************************************INICIA AS RODADAS DA COPA DO MUNDO*********
  *
 */
-void iniciaCOPADOMUNDO(void)
+void iniciaCOPADOMUNDO(void) // Executa todas as rodadas da copa do mundo.
 {
     // Obtém os placares das rodadas da copa, sequencialmente.
     iniciaOITAVAS();
@@ -482,7 +414,7 @@ void iniciaCOPADOMUNDO(void)
     iniciaFINAL();
 
     // Imprime o time campeão do mundo.
-    printf("%c\n", jogos[MAXJOGOS-1U].winner);
+    printf("%c\n", placares[MAXJOGOS-1U].winner);
 }
 
 // li e concordo com os termos da aps
