@@ -1,7 +1,8 @@
 /*
 * Desafio 8
 * Matheus Peschke de Azevedo - RA: 20396209
-* Gustavo Caldas de Souza - RA: 21352329
+* Gustavo Caldas de Souza    - RA: 21352329
+* Marcelo                    - RA: 21359738
 *
 * Se você tiver uma conta no Github, envie seu endereço
 * cadastrado no Github para 'mpeschke@gmail.com', para ter
@@ -10,31 +11,12 @@
 */
 #include "desafio8.h"
 
-// Não há tipo booleano em C, portanto
-// vamos criar um para facilitar a leitura
-// de operações booleanas no código:
-#define BOOL int
-#define TRUE 1
-#define FALSE 0
-
 // Variáveis para ajudar a lidar com operações de buffer.
 #define MAXJOGOS 15
 #define MAXBUFFPLACAR 5
 #define MINBUFFPLACAR 3
 #define MAXBUFFGOLS 2
 #define MAXGOLS 20
-
-/*
- * Estrutura para organizar as informações de um jogo.
- *
-*/
-struct Placar {
-    char mplayer;
-    unsigned int m;
-    char nplayer;
-    unsigned int n;
-    char winner;
-} typedef stPlacar;
 
 // Jogos totais, considerando todas as rodadas.
 static stPlacar placares[MAXJOGOS];
